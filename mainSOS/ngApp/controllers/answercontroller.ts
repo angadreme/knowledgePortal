@@ -7,69 +7,76 @@ namespace mainsos.Controllers {
     private comments;
     private Modal;
     public newAnswer = {
-      aDate: Date.now(),
+      aDate: new Date(),
       questionId: this.question,
       aContent: '',
       userId: '',  //this to be updated when we see what token will be as it will auto populate with who is logged in
       usefulCount: 0,
       bestAnswer: false,
       aCodeLink: '',
-    }
+    };
+    public administrator = false;
 
-    constructor(private questionService, private answerService, private commentService, private $stateParams, private $state, private $uibModal) {
-      console.log("Rosa" + $stateParams.id);
-      this.answers = this.questionService.getOne($stateParams.id).then((data) => {
+    constructor(private questionService, private answerService, private commentService, private $stateParams, private $state, private $uibModal, private lessonServices, private courseServices) {
+      this.checkAccess();
+      this.getQuestion($stateParams.id);
+      }
+
+    public getQuestion(id) {
+      this.questionService.getOne(id).then((data) => {
           this.question = data;
           this.listAnswers();
+          this.getSideInformation();
+          this.question.qCodeLink = this.checklink(this.question.qCodeLink);/////
       });
     }
 
+    public checkAccess(){
+      let x = sessionStorage.getItem('role');
+      if( x == 'admin'){
+        this.administrator = true;
+      }
+    }
+
     public listAnswers() {
-      console.log("questionId" + this.question._id);
       this.answers = this.answerService.getAllbyQuestion(this.question._id);
     }
 
+    /////
+    public checklink(link) {
+      var result;
+      var startingurl = 'http://';
+      var httpStartingurl = 'https://';
+      if (link==''){
+        result = link
+      } else if(link.startsWith(startingurl) || link.startsWith(httpStartingurl)) {
+        result = link
+      } else {
+        result = startingurl + link;
+      }
+      return result
+    }
+  //////
+
+
     public addAnswer(answers) {
-      this.answerService.add({
-        aDate: Date.now(),
+      this.newAnswer = this.answerService.add({
+        aDate: new Date(),
         questionId: this.$stateParams.id,
         aContent: this.newAnswer.aContent,
         userId: this.$stateParams.id,
         usefulCount: this.newAnswer.usefulCount,
         bestAnswer: this.newAnswer.bestAnswer,
         aCodeLink: this.newAnswer.aCodeLink,
-      }).then((data) => {
-        this.answerService.questionId = '';
-        this.answerService.aContent = '';
-        this.answerService.userId = '';
-        this.answerService.userfulCount = '';
-        this.answerService.bestAnswer = '';
-        this.answerService.aCodeLink = '';
-        this.answers.push(data);
-      })
-      this.listAnswers();
-    }
-
-      deleteAnswer(id) {
-      this.answerService.delete(id)
-      .then((data) => {
-      this.answers = this.answerService.answerShowAll();
-      })
-    }
-
-    public CommentsModal(ID) {
-      this.Modal = this.$uibModal.open({
-        templateUrl: '/ngApp/views/commentsModal.html',
-        controller: mainsos.Controllers.CommentsController,
-        controllerAs: 'controller',
-        size: 'lg',
-        resolve: {
-          ID: () => ID
-        }
+      }).then(() => {
+        this.listAnswers();
       });
+    }
 
-      this.Modal.closed.then( () => {
-        this.listAnswers()
+    public deleteAnswer(id) {
+      this.answerService.delete(id)
+      .then(() => {
+        this.listAnswers();
       });
     }
 
@@ -96,11 +103,12 @@ namespace mainsos.Controllers {
         },
         size: 'md'
       });
-    //  modal.closed.then(() => this.questionService.showAllQuestions());
+
+      modal.closed.then(() => {this.getQuestion(this.question._id)});
     }
 
     ////////////////upTick section for answers
-      countUpTickAnswer(answer) {
+      private countUpTickAnswer(answer) {
         answer.usefulCount += 1;
         this.answerService.update({
           _id: answer._id,
@@ -113,6 +121,92 @@ namespace mainsos.Controllers {
           aCodeLink: answer.aCodeLink,
         })
       }
+
+      //for side lessons list.---
+      private sideLesson;
+      private sideLessons;
+      private sideCourse;
+
+      private getSideInformation(){
+        this.lessonServices.getOne(this.question.lessonID).then((data) => {
+          this.sideLesson = data;
+          this.getSideCourse();
+        });
+      }
+
+      private getSideCourse(){
+        this.courseServices.getOne(this.sideLesson.courseId).then((data) => {
+          this.sideCourse = data;
+          this.getSideLessons();
+        });
+      }
+
+      private getSideLessons(){
+        this.sideLessons = this.lessonServices.getAllCourseLessons(this.sideCourse._id);
+      }
+
+      public redirectToQuestions(lessonId){
+        this.$state.go('questions', {id: lessonId});
+      }
+     //end for side lessons list.--
+
+     //for comments sections.---
+     public newComment = {
+       cDate: new Date(),
+       answerId: this.answer,
+       cContent: '',
+       userId: '',   //this to be updated when we see what token will be as it will auto populate with who is logged in
+       likeCount: 0
+     };
+
+     public answerComments(id) {
+       this.commentService.getAllbyAnswer(id).then((data) => {
+         this.comments = data;
+       });
+     }
+
+     public addComment(id){
+       console.log(id);
+       this.commentService.add({
+         cContent: this.newComment.cContent,
+         cDate: Date.now(),
+         answerId: id,
+         userId: this.newComment.userId,
+         likeCount: this.newComment.likeCount
+       }).then(() => {
+         this.answerComments(id);
+         this.newComment.cContent = '';
+       });
+     }
+     public deleteComment(ID, id){
+       this.commentService.delete(ID).then(() => this.answerComments(id));
+     }
+
+     public updateLikeCount(comment, id){
+       comment++;
+       this.commentService.add({
+         _id: comment._id,
+         cDate: comment.cDate,
+         answerId: comment.answerId,
+         cContent: comment.cContent,
+         userId: comment.userId,
+         likeCount: comment.likeCount
+       }).then(() => this.answerComments(id));
+     }
+
+     public updateComment(comment, id){
+       let modal = this.$uibModal.open({
+         templateUrl: '/ngApp/views/updateCommentsModal.html',
+         controller: mainsos.Controllers.updateCommentsController,
+         controllerAs: 'controller',
+         size: 'md',
+         resolve: {
+           comment: () => comment
+         }
+       });
+
+       modal.closed.then(() => this.answerComments(id));
+     }
 
 }
 
@@ -169,8 +263,6 @@ namespace mainsos.Controllers {
         lessonID: this.questions.lessonID,
         clickCount: this.questions.clickCount,
         qCodeLink: this.questions.qCodeLink
-      }).then(() => {
-      this.questionService.showAllQuestions()
       }).then(() => {this.close()});
     }
 
@@ -180,77 +272,7 @@ namespace mainsos.Controllers {
 
   }
 
-  export class CommentsController {
-    private answer;
-    private comments;
-    public newComment = {
-      cDate: Date.now(),
-      answerId: '',
-      cContent: '',
-      userId: '',   //this to be updated when we see what token will be as it will auto populate with who is logged in
-      likeCount: 0
-    }
-
-    constructor(ID, private answerService, private commentService, private $uibModalInstance, private $uibModal){
-      answerService.getOne(ID).then((data) => {
-        this.answer = data;
-        this.listComments();
-      });
-    }
-
-    public listComments() {
-      this.comments = this.commentService.getAllbyAnswer(this.answer._id);
-    }
-
-    public addComment(){
-      this.commentService.add({
-        cContent: this.newComment.cContent,
-        cDate: Date.now(),
-        answerId: this.answer._id,
-        userId: this.newComment.userId,
-        likeCount: this.newComment.likeCount
-      }).then(() => {
-        this.listComments();
-        this.newComment.cContent = '';
-      });
-    }
-
-    public deleteComment(ID){
-      this.commentService.delete(ID).then(() => this.listComments());
-    }
-
-    public updateLikeCount(comment){
-      comment++;
-      this.commentService.add({
-        _id: comment._id,
-        cDate: comment.cDate,
-        answerId: comment.answerId,
-        cContent: comment.cContent,
-        userId: comment.userId,
-        likeCount: comment.likeCount
-      }).then(() => this.listComments());
-    }
-
-    public updateComment(comment){
-      let Modal = this.$uibModal.open({
-        templateUrl: '/ngApp/views/updateCommentsModal.html',
-        controller: mainsos.Controllers.updateCommentsController,
-        controllerAs: 'controller',
-        size: 'md',
-        resolve: {
-          comment: () => comment
-        }
-      });
-
-      Modal.closed.then(() => this.listComments());
-    }
-
-    public ok() {
-      this.$uibModalInstance.close();
-    }
-  }
-
-  export class updateCommentsController{
+  export class updateCommentsController {
       private comment;
 
       constructor(comment, private commentService, private $uibModalInstance){
@@ -270,9 +292,8 @@ namespace mainsos.Controllers {
         }).then(() => this.$uibModalInstance.close());
       }
 
-      public closeUpdateModal(){
+      public close(){
         this.$uibModalInstance.close();
       }
   }
-
 }

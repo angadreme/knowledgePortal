@@ -77,6 +77,10 @@ body {
   }
 }
 
+#topSpacing{
+  margin-top: 111px;
+}
+
 /* IMPORT SCSS MODULES (PARTIALS) */
 
 @import 'modules/components/box';
@@ -87,6 +91,7 @@ body {
 
 @import 'modules/template/header';
 @import 'modules/template/sidebar';
+@import 'modules/template/modal';
 
 @import 'modules/content/courses';
 @import 'modules/content/search';

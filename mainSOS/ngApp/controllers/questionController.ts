@@ -6,20 +6,27 @@ namespace mainsos.Controllers {
     public newQuestion = {
       qTitle: '',
       qContent: '',
-      qDate: Date.now(),
+      qDate: new Date(),
       lessonID: this.lesson,
       clickCount: 0,
       userId: '',
       qCodeLink: ''
-    }
+    };
+    public administrator = false;
 
     constructor(private lessonServices, private questionService, private $stateParams, private $state, private $uibModal) {
-      console.log($stateParams.id);
+      this.checkAccess();
       lessonServices.getOne($stateParams.id).then((data) => {
           this.lesson = data;
           this.listQuestions();
-          console.log(this.questions);
         })
+    }
+
+    public checkAccess(){
+      let x = sessionStorage.getItem('role');
+      if( x == 'admin'){
+        this.administrator = true;
+      }
     }
 
     public listQuestions() {
@@ -45,7 +52,7 @@ namespace mainsos.Controllers {
            this.listQuestions());
          }
 
-     deleteQuestion(id) {
+    public deleteQuestion(id) {
        this.questionService.delete(id)
        .then((data) => {
          this.questions = this.questionService.showAllQuestions();
@@ -55,5 +62,21 @@ namespace mainsos.Controllers {
     public delete(ID) {
       this.questionService.delete(ID).then(() => this.listQuestions());
     }
+
+    public countUpTick(question) {
+  question.clickCount += 1;
+  this.questionService.update({
+    _id: question._id,
+    qTitle: question.qTitle,
+    qContent: question.qContent,
+    qDate: question.qDate,
+    lessonID: question.lessonID,
+    clickCount: question.clickCount,
+    userId: question.userId,
+    qCodeLink: question.qCodeLink
+  })//.then(() => {this.listQuestions()});
+}
+
+
 }
 }

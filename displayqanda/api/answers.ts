@@ -12,9 +12,16 @@ router.get('/:id', (req, res) => {
   .then((foundanswer) => res.json(foundanswer));
 });
 
-router.get('/:date', (req, res) => {
-  Answer.find({aDate: {$where: "Answer.aDate > req.params.date"}})
-  .then((matches) => res.json(matches));
+router.get('/getDate/:date', (req, res) => {
+   let rightNow = new Date().toJSON();
+   Answer.find({aDate: {
+         $lte : rightNow,
+         $gt : req.params.date
+   }})
+   .then((matches) => {
+     res.json(matches)
+    })
+   .catch((err) => console.log(err));
 });
 
 router.get('/questions/:id/answers', (req, res) => {

@@ -8,22 +8,29 @@ namespace mainsos.Controllers{
       title: '',
       courseId: ''
     };
+    public administrator = false;
 
     constructor(private courseServices, private lessonServices, private $stateParams, private $state, private questionService, private answerService, private commentService, private $uibModal){
-      //console.log($stateParams.id);
+      this.checkAccess();
       courseServices.getOne($stateParams.id).then((data) => {
         this.Course = data;
         this.listLessons();
+        this.getTrendingQuestions();
       })
     }
 
+    public checkAccess(){
+      let x = sessionStorage.getItem('role');
+      if( x == 'admin'){
+        this.administrator = true;
+      }
+    }
+
     public listLessons(){
-      //console.log(this.Course);
       this.lessons = this.lessonServices.getAllCourseLessons(this.Course._id);
     }
 
     public redirectToQuestions(lessonId){
-      //console.log(lessonId);
       this.$state.go('questions', {id: lessonId});
     }
 
@@ -31,15 +38,11 @@ namespace mainsos.Controllers{
       this.newLesson = this.lessonServices.add({
         title: this.newLesson.title,
         courseId: this.$stateParams.id,
-      }).then(() => this.lessonServices.reShow());
+      }).then(() => this.listLessons());
     }
 
-    // public editLesson(id){
-    //   this.lessonServices.post(id).then(() => this.lessonServices.reShow());
-    // }
-
     public delete(course){
-      this.lesson = this.lessonServices.delete(course._id).then(() => this.lessonServices.reShow());
+      this.lesson = this.lessonServices.delete(course._id).then(() => this.listLessons());
     }
 
     public showEditLessonModal(lesson){
@@ -51,40 +54,42 @@ namespace mainsos.Controllers{
           lesson: () => lesson
         },
         size: 'md',
-      })
+      });
       modal.closed.then(() => {this.listLessons()});
     }
 
     //trending Section..................
 
     private trendComments;
-    private trendAnswers = [];
+    private trendAnswers;
     private trendQuestions = [];
     private referenceDate;
 
-    public getTrendingQuestions(){
-      this.setNeededDate();
-      this.answerService.getAllbyDate().then((data) => {
-        this.trendAnswers = data;
+    public getTrendingQuestions() {
+      this.setReferenceDate();
+      console.log(this.referenceDate.toJSON());
+      this.answerService.getAllbyDate(this.referenceDate.toJSON()).then((data) => {
+        console.log(data);
+        this.trendAnswers = data || [];
         this.getCommentsbyDate();
       })
 
     }
 
-    public setNeededDate(){
-      this.referenceDate = Date.now();
+    public setReferenceDate() {
+      this.referenceDate = new Date();
       this.referenceDate.setHours(this.referenceDate.getHours() - 24);  //this grab everything with a answers or comment posted in the last 24 hours.
     }
 
     public getCommentsbyDate(){
-      this.commentService.getAllbyDate().then((data) => {
+      this.commentService.getAllbyDate(this.referenceDate.toJSON()).then((data) => {
         this.trendComments = data;
         this.addtoTrendingAnswers();
         this.addtoTrendingQuestions();
       })
     }
 
-    public addtoTrendingAnswers(){
+    public addtoTrendingAnswers() {
       for(let i = 0; i < this.trendComments.length; i++){
         this.answerService.getOne(this.trendComments[i].answerId).then((data) => {
           let tempAnswer = data;
@@ -99,10 +104,12 @@ namespace mainsos.Controllers{
           }
         });
       }
+      this.addtoTrendingQuestions();
+      console.log('trendAnswers')
     }
 
 
-    public addtoTrendingQuestions(){
+    public addtoTrendingQuestions() {
       for(let i = 0; i < this.trendAnswers.length; i++){
         this.questionService.getOne(this.trendAnswers[i].questionId).then((data) => {
           let tempQuestion = data;
@@ -118,6 +125,11 @@ namespace mainsos.Controllers{
         });
       }
       console.log('trendQuestions');
+    }
+
+    public redirectToAnswers(questionId) {
+      console.log(questionId)
+      this.$state.go('answers', {id: questionId});
     }
 
   }
